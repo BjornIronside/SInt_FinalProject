@@ -3,12 +3,14 @@ from itertools import product
 import random
 import time
 import visualization
+import matplotlib.pyplot as plt
 
 
 def QLearning(eps=0.1, step_size=0.1, niter=10000, discount_rate=1, natural=False):
     game = blackjack.BlackjackEnv(natural=natural)
     game_results = {-1: 0, 0: 0, 1: 0, 1.5: 0}
     winrates = []
+    n_sub_optimals = []
     Q = InitializeQ()
     for i in range(niter):
         state = game.reset()
@@ -35,14 +37,14 @@ def QLearning(eps=0.1, step_size=0.1, niter=10000, discount_rate=1, natural=Fals
 
             state = new_state
         game_results[reward] += 1
-        if i % 1000 == 0:
+        if i % 10000 == 0:
             print('Iteration ', i)
-            last_winrate = (game_results[1] + game_results[1.5]) / 10
+            policy = getOptimalPolicy(Q)
+            last_winrate, last_n_sub_optimal = EvaluatePolicy(policy, natural=natural)
             winrates.append(last_winrate)
-            print('Win rate of the last 1000 games: {:.2f} %\n'.format(last_winrate))
-            game_results = {-1: 0, 0: 0, 1: 0, 1.5: 0}
+            n_sub_optimals.append(last_n_sub_optimal)
 
-    return Q, winrates
+    return Q, winrates, n_sub_optimals
 
 
 def InitializeQ():
@@ -51,7 +53,7 @@ def InitializeQ():
             product(range(12, 22), range(1, 11), [True, False])}
 
 
-def EvaluatePolicy(policy, niter=1000, natural=False):
+def EvaluatePolicy(policy, niter=100, natural=False):
     results = {-1: 0, 0: 0, 1: 0, 1.5: 0}
     game = blackjack.BlackjackEnv(natural=natural)
     for i in range(niter):
@@ -67,18 +69,32 @@ def EvaluatePolicy(policy, niter=1000, natural=False):
             state = new_state
         results[reward] += 1
 
-    print('Win Rate: {:.2f} %'.format((results[1] + results[1.5]) / niter * 100))
+    winrate = (results[1] + results[1.5]) / niter * 100
+    print('Win Rate: {:.2f} %'.format(winrate))
+    n_sub_optimal = visualization.compare2Optimal(policy)
+    print('Suboptimal Actions: {}/200\n'.format(n_sub_optimal))
+    return winrate, n_sub_optimal
+
+
+def getOptimalPolicy(Q):
+    return {state: int(values[1] > values[0]) for state, values in Q.items()}
 
 
 def main():
     tic = time.time()
-    Q, winrates = QLearning(eps=0.05, step_size=0.1, niter=1000000, natural=False)
+    Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
     toc = time.time()
-    print('Elapsed time: ', toc - tic, ' s')
-    policy = visualization.getOptimalPolicy(Q)
+    print('Elapsed time: {:.4f} s'.format(toc-tic))
+    policy = getOptimalPolicy(Q)
     EvaluatePolicy(policy)
-    visualization.showPolicy(Q)
-    visualization.LearningProgess(winrates)
+    with plt.style.context('grayscale'):
+        fig_policy = visualization.showPolicy(Q, policy)
+
+    with plt.style.context('ggplot'):
+        fig_learn = visualization.LearningProgess(winrates, n_sub_optimals)
+    # plt.style.use('seaborn')
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
