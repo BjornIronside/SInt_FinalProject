@@ -4,85 +4,130 @@ import random
 import time
 import visualization
 import matplotlib.pyplot as plt
+import numpy as np
 
 
-def QLearning(eps=0.1, step_size=0.1, niter=100000, discount_rate=1, natural=False):
-    game = blackjack.BlackjackEnv(natural=natural)
-    game_results = {-1: 0, 0: 0, 1: 0, 1.5: 0}
-    winrates = []
-    n_sub_optimals = []
-    Q = InitializeQ()
-    for i in range(niter + 1):
-        state = game.reset()
-        done = False
+class QLearningAgent:
+    def __init__(self, explore_policy='constant_epson', eps=0.05, step_size=0.1, discount_rate=1, natural=False,
+                 eps_decay=0.9999, show_every=10000, evaluate_iter=1000, temp_decay=0.99, init_temp=20):
+        self.lr = step_size
+        self.discount_rate = discount_rate
+        self.Q = self.initializeQ()
+        self.winrates = []
+        self.natural = natural
+        self.show_every = show_every
+        self.evaluate_iter = evaluate_iter
+        self.env = blackjack.BlackjackEnv(natural=self.natural)
+        self.n_sub_optimals = []
+        if explore_policy == 'constant_epson':
+            self.explore_policy = self.e_greedy
+            self.eps = eps
+            self.eps_decay = 1
+            self.temp = init_temp
+            self.temp_decay = 1
+        elif explore_policy == 'decay_epson':
+            self.explore_policy = self.e_greedy
+            self.eps = 1
+            self.eps_decay = eps_decay
+            self.temp = init_temp
+            self.temp_decay = 1
+        elif explore_policy == 'boltzmann_exploration':
+            self.explore_policy = self.boltzmann_exploration
+            self.eps = 1
+            self.eps_decay = 1
+            self.temp = init_temp
+            self.temp_decay = temp_decay
 
-        while not done:
-            if state[0] < 12:
-                new_state, reward, done, _ = game.step(1)
-            else:
-                state_values = Q[state]
-                action = eGreedy(state_values, eps)
-                new_state, reward, done, _ = game.step(action)
-                if not done:
-                    Q[state][action] = Q[state][action] + step_size * (
-                            reward + discount_rate * max(Q[new_state]) - Q[state][action])
+    def e_greedy(self, state_values):
+        best_action = state_values.index(max(state_values))
+        roll = random.random()
+        if roll < self.eps:
+            action = random.choice([0, 1])
+        else:
+            action = best_action
+        return action
+
+    def boltzmann_exploration(self, state_values):
+        state_values = np.array(state_values)
+        exp_values = np.exp(state_values) / self.temp
+        probs = exp_values / np.sum(exp_values)
+        roll = random.random()
+        if roll < probs[0]:
+            action = 0
+        else:
+            action = 1
+        return action
+
+    def initializeQ(self):
+        return {state: [0, 0] for state in
+                product(range(12, 22), range(1, 11), [True, False])}
+
+    def train(self, niter=10_000):
+        self.Q = self.initializeQ()
+        self.winrates = []
+        env = 1
+        self.n_sub_optimals = []
+        for i in range(niter + 1):
+            state = self.env.reset()
+            done = False
+
+            while not done:
+                if state[0] < 12:
+                    new_state, reward, done, _ = self.env.step(1)
                 else:
-                    Q[state][action] = Q[state][action] + step_size * (
-                            reward + discount_rate * 0 - Q[state][action])
+                    state_values = self.Q[state]
+                    action = self.explore_policy(state_values)
+                    new_state, reward, done, _ = self.env.step(action)
+                    if not done:
+                        self.Q[state][action] = self.Q[state][action] + self.lr * (
+                                reward + self.discount_rate * max(self.Q[new_state]) - self.Q[state][action])
+                    else:
+                        self.Q[state][action] = self.Q[state][action] + self.lr * (
+                                reward + self.discount_rate * 0 - self.Q[state][action])
 
-            state = new_state
-        game_results[reward] += 1
-        if i % 100000 == 0:
-            print('Iteration ', i)
-            policy = getOptimalPolicy(Q)
-            last_winrate, last_n_sub_optimal = EvaluatePolicy(policy, natural=natural)
-            winrates.append(last_winrate)
-            n_sub_optimals.append(last_n_sub_optimal)
+                state = new_state
 
-    return Q, winrates, n_sub_optimals
+            # decay eps
+            if self.eps_decay != 1:
+                self.eps *= self.eps_decay
 
+            # temp decay
+            if self.temp_decay != 1:
+                self.temp *= self.temp_decay
 
-def eGreedy(state_values, eps):
-    best_action = state_values.index(max(state_values))
-    roll = random.random()
-    if roll < eps:
-        action = random.choice([0, 1])
-    else:
-        action = best_action
-    return action
+            if i % self.show_every == 0:
+                print('Iteration ', i)
+                print(self.eps)
+                self.evaluate_policy()
 
+        return self.Q, self.winrates, self.n_sub_optimals
 
-def InitializeQ():
-    # Initialize Q matrix as [0, 0] for each possible state
-    return {state: [0, 0] for state in
-            product(range(12, 22), range(1, 11), [True, False])}
+    def get_best_policy(self):
+        return {state: int(values[1] > values[0]) for state, values in self.Q.items()}
 
+    def evaluate_policy(self):
+        results = {-1: 0, 0: 0, 1: 0, 1.5: 0}
+        policy = self.get_best_policy()
+        game = blackjack.BlackjackEnv(natural=self.natural)
+        for i in range(self.evaluate_iter):
+            state = game.reset()
+            done = False
 
-def EvaluatePolicy(policy, niter=10000, natural=False):
-    results = {-1: 0, 0: 0, 1: 0, 1.5: 0}
-    game = blackjack.BlackjackEnv(natural=natural)
-    for i in range(niter):
-        state = game.reset()
-        done = False
+            while not done:
+                if state[0] < 12:
+                    new_state, reward, done, _ = game.step(1)
+                else:
+                    action = policy[state]
+                    new_state, reward, done, _ = game.step(action)
+                state = new_state
+            results[reward] += 1
 
-        while not done:
-            if state[0] < 12:
-                new_state, reward, done, _ = game.step(1)
-            else:
-                action = policy[state]
-                new_state, reward, done, _ = game.step(action)
-            state = new_state
-        results[reward] += 1
-
-    winrate = (results[1] + results[1.5]) / niter * 100
-    print('Win Rate: {:.2f} % ({} games)'.format(winrate, niter))
-    n_sub_optimal = visualization.compare2Optimal(policy)
-    print('Suboptimal Actions: {}/200\n'.format(n_sub_optimal))
-    return winrate, n_sub_optimal
-
-
-def getOptimalPolicy(Q):
-    return {state: int(values[1] > values[0]) for state, values in Q.items()}
+        winrate = (results[1] + results[1.5]) / self.evaluate_iter * 100
+        print('Win Rate: {:.2f} % ({} games)'.format(winrate, self.evaluate_iter))
+        n_sub_optimal = visualization.compare2Optimal(policy)
+        print('Suboptimal Actions: {}/200\n'.format(n_sub_optimal))
+        self.winrates.append(winrate)
+        self.n_sub_optimals.append(n_sub_optimal)
 
 
 def TestParameters(niter=100000, natural=False):
@@ -99,11 +144,13 @@ def TestParameters(niter=100000, natural=False):
 
 def main():
     tic = time.time()
-    Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
+    # Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
+    agent = QLearningAgent(explore_policy='boltzmann_exploration')
+    print(agent.explore_policy)
+    Q, winrates, n_sub_optimals = agent.train(niter=100000)
     toc = time.time()
     print('Elapsed time: {:.4f} s'.format(toc - tic))
-    policy = getOptimalPolicy(Q)
-    EvaluatePolicy(policy)
+    policy = agent.get_best_policy()
     with plt.style.context('grayscale'):
         fig_policy = visualization.showPolicy(Q, policy)
 
