@@ -9,7 +9,7 @@ import numpy as np
 
 class QLearningAgent:
     def __init__(self, explore_policy='constant_epson', eps=0.05, step_size=0.1, discount_rate=1, natural=False,
-                 eps_decay=0.9999, show_every=10000, evaluate_iter=1000, temp_decay=0.9999, init_temp=20):
+                 eps_decay=0.9999, min_eps=0.001, show_every=10000, evaluate_iter=1000, temp_decay=0.9999, init_temp=20):
         self.lr = step_size
         self.discount_rate = discount_rate
         self.Q = self.initializeQ()
@@ -19,6 +19,7 @@ class QLearningAgent:
         self.evaluate_iter = evaluate_iter
         self.env = blackjack.BlackjackEnv(natural=self.natural)
         self.n_sub_optimals = []
+        self.min_eps = min_eps
         if explore_policy == 'constant_epson':
             self.explore_policy = self.e_greedy
             self.eps = eps
@@ -88,8 +89,9 @@ class QLearningAgent:
                 state = new_state
 
             # decay eps
-            if self.eps_decay != 1:
+            if self.eps_decay != 1 and self.eps > self.min_eps:
                 self.eps *= self.eps_decay
+                self.eps = max(self.eps, self.min_eps)
 
             # temp decay
             if self.temp_decay != 1:
@@ -123,7 +125,7 @@ class QLearningAgent:
             results[reward] += 1
 
         winrate = (results[1] + results[1.5]) / self.evaluate_iter * 100
-        print('Win Rate: {:.2f} % ({} games)'.format(winrate, self.evaluate_iter))
+        print('\nWin Rate: {:.2f} % ({} games)'.format(winrate, self.evaluate_iter))
         n_sub_optimal = visualization.compare2Optimal(policy)
         print('Suboptimal Actions: {}/200\n'.format(n_sub_optimal))
         self.winrates.append(winrate)
@@ -156,7 +158,6 @@ def main():
 
     with plt.style.context('ggplot'):
         fig_learn = visualization.LearningProgess(winrates, n_sub_optimals)
-    # plt.style.use('seaborn')
     plt.tight_layout()
     plt.show()
 

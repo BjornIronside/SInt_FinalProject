@@ -8,18 +8,21 @@ import time
 import random
 from tqdm import tqdm
 import blackjack
+from itertools import product
+import visualization
 
 
 class DQNAgent:
-    MODEL_NAME = "4x10x2"
+    MODEL_NAME = "3x10x2"
     DISCOUNT = 1
     REPLAY_MEMORY_SIZE = 50_000  # How many last steps to keep for model training
     MIN_REPLAY_MEMORY_SIZE = 1_000  # Minimum number of steps in a memory to start training
     MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
     UPDATE_TARGET_EVERY = 5  # Terminal states (end of episodes)
-    EPSILON_DECAY = 0.99975
+    EPS_DECAY = 0.99975
     MIN_EPSILON = 0.001
-    AGGREGATE_STATS_EVERY = 50
+    EVALUATE_EVERY = 500
+    NATURAL = False
 
     def __init__(self):
         # main model  # gets trained every step
@@ -34,15 +37,15 @@ class DQNAgent:
 
         self.target_update_counter = 0
 
-        self.env = blackjack.BlackjackEnv(natural=False)
+        self.env = blackjack.BlackjackEnv(natural=self.NATURAL)
         self.ep_rewards = []
-        self.epsilon = 1
+        self.eps = 1
 
     def create_model(self):
         model = Sequential()
         model.add(Dense(3, activation='relu', input_dim=3))
         model.add(Dense(10, activation='relu'))
-        model.add(Dense(2, activation='softmax'))
+        model.add(Dense(2, activation='linear'))
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
         return model
 
@@ -113,15 +116,15 @@ class DQNAgent:
     def normalize_state(self, state):
         return np.array([(state[0] - 11) / 10, state[1] / 10, int(state[2])]).reshape(1, 3)
 
-    def TrainAgent(self, n_episodes=50_000):
-        self.epsilon = 1
-        for episode in tqdm(range(1, n_episodes + 1), ascii=True, unit='episodes'):
+    def TrainAgent(self, n_episodes=50_000, n_eval_episodes=1_000):
+        self.eps = 1
+        for episode in tqdm(range(1, n_episodes + 1), ascii=False, unit='episode'):
 
             # Start game
             current_state = self.env.reset()
             done = False
             while not done:
-                if np.random.random() > self.epsilon:
+                if np.random.random() > self.eps:
                     # Get action from Q table
                     action = np.argmax(self.get_qs(current_state))
                 else:
@@ -139,16 +142,63 @@ class DQNAgent:
                 # Append episode reward to a list and log stats (every given number of episodes)
             self.ep_rewards.append(reward)
 
+            if episode % self.EVALUATE_EVERY == 0 and len(self.replay_memory) > self.MIN_REPLAY_MEMORY_SIZE:
+                self.evaluate_model(n_episodes=n_eval_episodes)
+
             # Decay epsilon
-            if self.epsilon > self.MIN_EPSILON:
-                self.epsilon *= self.EPSILON_DECAY
-                self.epsilon = max(self.MIN_EPSILON, self.epsilon)
+            if self.eps > self.MIN_EPSILON:
+                self.eps *= self.EPS_DECAY
+                self.eps = max(self.MIN_EPSILON, self.eps)
+
+        self.model.save('models/{}__{}__{}.model'.format(self.MODEL_NAME, self.EPS_DECAY, n_episodes))
+
+    def evaluate_model(self, n_episodes):
+        results = {-1: 0, 0: 0, 1: 0, 1.5: 0}
+        q_table = self.get_q_table()
+        policy = self.get_best_policy(q_table)
+        game = blackjack.BlackjackEnv(natural=self.NATURAL)
+        for i in range(n_episodes):
+            state = game.reset()
+            done = False
+
+            while not done:
+                if state[0] < 12:
+                    new_state, reward, done, _ = game.step(1)
+                else:
+                    action = policy[state]
+                    new_state, reward, done, _ = game.step(action)
+                state = new_state
+            results[reward] += 1
+
+        winrate = (results[1] + results[1.5]) / n_episodes * 100
+        print('Win Rate: {:.2f} % ({} games)'.format(winrate, n_episodes))
+        n_sub_optimal = visualization.compare2Optimal(policy)
+        print('Suboptimal Actions: {}/200\n'.format(n_sub_optimal))
+
+    def get_best_policy(self, q_table):
+        policy = {state: np.argmax(values) for state, values in q_table.items()}
+        return policy
+
+    def get_q_table(self):
+        q_table = {state: self.get_qs(state) for state in product(range(12, 22), range(1, 11), [True, False])}
+        return q_table
 
 
 def main():
     agent = DQNAgent()
 
     agent.TrainAgent(n_episodes=10_000)
+    q_table = agent.get_q_table()
+    policy = agent.get_best_policy(q_table)
+
+    """with plt.style.context('grayscale'):
+        fig_policy = visualization.showPolicy(Q, policy)
+
+    with plt.style.context('ggplot'):
+        fig_learn = visualization.LearningProgess(winrates, n_sub_optimals)
+    # plt.style.use('seaborn')
+    plt.tight_layout()
+    plt.show()"""
 
 
 if __name__ == '__main__':
