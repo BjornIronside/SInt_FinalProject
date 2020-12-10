@@ -9,7 +9,7 @@ import numpy as np
 
 class QLearningAgent:
     def __init__(self, explore_policy='constant_epson', eps=0.05, step_size=0.1, discount_rate=1, natural=False,
-                 eps_decay=0.9999, show_every=10000, evaluate_iter=1000, temp_decay=0.99, init_temp=20):
+                 eps_decay=0.9999, show_every=10000, evaluate_iter=1000, temp_decay=0.9999, init_temp=20):
         self.lr = step_size
         self.discount_rate = discount_rate
         self.Q = self.initializeQ()
@@ -42,7 +42,7 @@ class QLearningAgent:
         best_action = state_values.index(max(state_values))
         roll = random.random()
         if roll < self.eps:
-            action = random.choice([0, 1])
+            action = random.randint(0, 1)
         else:
             action = best_action
         return action
@@ -97,7 +97,7 @@ class QLearningAgent:
 
             if i % self.show_every == 0:
                 print('Iteration ', i)
-                print(self.eps)
+                print('Eps: {}\nTemp: {}'.format(self.eps, self.temp))
                 self.evaluate_policy()
 
         return self.Q, self.winrates, self.n_sub_optimals
@@ -147,7 +147,7 @@ def main():
     # Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
     agent = QLearningAgent(explore_policy='boltzmann_exploration')
     print(agent.explore_policy)
-    Q, winrates, n_sub_optimals = agent.train(niter=100000)
+    Q, winrates, n_sub_optimals = agent.train(niter=1_000_000)
     toc = time.time()
     print('Elapsed time: {:.4f} s'.format(toc - tic))
     policy = agent.get_best_policy()
