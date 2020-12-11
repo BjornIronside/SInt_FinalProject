@@ -13,13 +13,13 @@ import visualization
 
 
 class DQNAgent:
-    MODEL_NAME = "3x10x2"
+    MODEL_NAME = "3x10x10x2"
     DISCOUNT = 1
     REPLAY_MEMORY_SIZE = 50_000  # How many last steps to keep for model training
     MIN_REPLAY_MEMORY_SIZE = 1_000  # Minimum number of steps in a memory to start training
     MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
     UPDATE_TARGET_EVERY = 5  # Terminal states (end of episodes)
-    EPS_DECAY = 0.99975
+    EPS_DECAY = 0.99995
     MIN_EPSILON = 0.001
     EVALUATE_EVERY = 500
     NATURAL = False
@@ -44,6 +44,7 @@ class DQNAgent:
     def create_model(self):
         model = Sequential()
         model.add(Dense(3, activation='relu', input_dim=3))
+        model.add(Dense(10, activation='relu'))
         model.add(Dense(10, activation='relu'))
         model.add(Dense(2, activation='linear'))
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=['accuracy'])
@@ -171,7 +172,7 @@ class DQNAgent:
             results[reward] += 1
 
         winrate = (results[1] + results[1.5]) / n_episodes * 100
-        print('Win Rate: {:.2f} % ({} games)'.format(winrate, n_episodes))
+        print('\nWin Rate: {:.2f} % ({} games)'.format(winrate, n_episodes))
         n_sub_optimal = visualization.compare2Optimal(policy)
         print('Suboptimal Actions: {}/200\n'.format(n_sub_optimal))
 

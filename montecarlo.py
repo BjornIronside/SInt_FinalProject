@@ -70,28 +70,28 @@ class MCLearningAgent:
             state = self.env.reset()
             memory = []
             gameEnd = False
-            isFirstState = 'True'
+            isFirstState = True
 
             while not gameEnd:
                 if state[0] < 12:
                     newState, reward, gameEnd, _ = self.env.step(1)
-                elif isFirstState == 'True':
-                    isFirstState = 'False'
+                elif isFirstState:
+                    isFirstState = False
                     action = random.randint(0, 1)
                     newState, reward, gameEnd, _ = self.env.step(action)
                     memory.append((state, action, reward))
                 else:
-                    state_values = self.Q[state]
+                    """state_values = self.Q[state]
                     action = state_values.index(max(state_values))
                     newState, reward, gameEnd, _ = self.env.step(action)
                     memory.append((state, action, reward))
-                state = newState
+                state = newState"""
 
-                #     state_values = self.Q[state]
-                #     action = self.explore_policy(state_values)
-                #     newState, reward, gameEnd, _ = self.env.step(action)
-                #     memory.append((state, action, reward))
-                # state = newState
+                    state_values = self.Q[state]
+                    action = self.explore_policy(state_values)
+                    newState, reward, gameEnd, _ = self.env.step(action)
+                    memory.append((state, action, reward))
+                state = newState
 
             G = 0
             gamma = 1
@@ -191,7 +191,7 @@ class MCLearningAgent:
 def main():
     tic = time.time()
     # Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
-    agent = MCLearningAgent(explore_policy='constant_epson',eps=0.1)
+    agent = MCLearningAgent(explore_policy='decay_epson', eps=0.1)
     print(agent.explore_policy)
     Q, winrates, n_sub_optimals = agent.exploringStarts(numIterations=500_000)
     toc = time.time()
@@ -206,6 +206,6 @@ def main():
     plt.tight_layout()
     plt.show()
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     main()

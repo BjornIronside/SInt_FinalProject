@@ -123,3 +123,37 @@ def LearningProgess(winrates, n_sub_optimals):
 
     fig_learn.set_tight_layout(True)
     return fig_learn
+
+
+def LearningProgressComparisonQLearning(results, mode, show_every=100_000):
+    n_points = len(list(results.values())[0]['winrates'])
+    x_iter = np.array([i * show_every for i in range(n_points)])
+    if mode == 'constant_epsilon':
+        param_name = 'eps'
+    elif mode == 'decay_epsilon':
+        param_name = 'eps_decay'
+    elif mode == 'boltzmann_exploration':
+        param_name = 'temp_decay'
+
+
+
+    fig_win, ax_win = plt.subplots()
+    ax_win.set_title('Win Rate of Policy Over 10000 Games')
+    ax_win.set_xlabel('Iteration')
+    ax_win.set_ylabel('Win Rate %')
+
+    fig_opt, ax_opt = plt.subplots()
+    ax_opt.set_title('Difference from Optimal Policy')
+    ax_opt.set_xlabel('Iteration')
+    ax_opt.set_ylabel('Number of Suboptimal Actions')
+
+    for param, step_size in results.keys():
+        ax_win.plot(x_iter, np.array(results[(param, step_size)]['winrates']),
+                    label='{}={:.4f} step_size={:.1f}'.format(param_name, param, step_size))
+        ax_opt.plot(np.array(results[(param, step_size)]['n_sub_optimals']),
+                    label='{}={:.4f} step_size={:.1f}'.format(param_name, param, step_size))
+
+    ax_win.legend()
+    ax_opt.legend()
+
+    return fig_opt, fig_win
