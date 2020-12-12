@@ -135,8 +135,6 @@ def LearningProgressComparisonQLearning(results, mode, show_every=100_000):
     elif mode == 'boltzmann_exploration':
         param_name = 'temp_decay'
 
-
-
     fig_win, ax_win = plt.subplots()
     ax_win.set_title('Win Rate of Policy Over 10000 Games')
     ax_win.set_xlabel('Iteration')
@@ -150,7 +148,7 @@ def LearningProgressComparisonQLearning(results, mode, show_every=100_000):
     for param, step_size in results.keys():
         ax_win.plot(x_iter, np.array(results[(param, step_size)]['winrates']),
                     label='{}={:.4f} step_size={:.1f}'.format(param_name, param, step_size))
-        ax_opt.plot(np.array(results[(param, step_size)]['n_sub_optimals']),
+        ax_opt.plot(x_iter, np.array(results[(param, step_size)]['n_sub_optimals']),
                     label='{}={:.4f} step_size={:.1f}'.format(param_name, param, step_size))
 
     ax_win.legend()

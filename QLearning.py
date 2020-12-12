@@ -5,6 +5,7 @@ import time
 import visualization
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 
 
 class QLearningAgent:
@@ -66,12 +67,12 @@ class QLearningAgent:
         return {state: [0, 0] for state in
                 product(range(12, 22), range(1, 11), [True, False])}
 
-    def train(self, niter=10_000):
+    def train(self, n_episodes=10_000):
         self.Q = self.initializeQ()
         self.winrates = []
         env = 1
         self.n_sub_optimals = []
-        for i in range(niter + 1):
+        for i in tqdm(range(1, n_episodes + 1), ascii=False, unit='episode'):
             state = self.env.reset()
             done = False
 
@@ -102,8 +103,7 @@ class QLearningAgent:
                 self.temp = max(self.temp, self.min_temp)
 
             if i % self.show_every == 0:
-                print('Iteration ', i)
-                print('Eps: {:.4f}\nTemp: {:.4f}'.format(self.eps, self.temp))
+                print('\nEps: {:.4f}\nTemp: {:.4f}'.format(self.eps, self.temp))
                 self.evaluate_policy()
 
         return self.Q, self.winrates, self.n_sub_optimals
@@ -148,7 +148,7 @@ def TestParameters(niter=10_000_000, natural=False):
         print('\n\nStarting Training for eps={:.2f} step_size={:.1f}'.format(eps, step_size))
         agent = QLearningAgent(explore_policy=mode, natural=natural, eps=eps, lr=step_size, show_every=100_000,
                                evaluate_iter=10_000)
-        Q, winrates, n_sub_optimals = agent.train(niter=niter)
+        Q, winrates, n_sub_optimals = agent.train(n_episodes=niter)
         policy = agent.get_best_policy()
         results[mode][(eps, step_size)] = {'Q': Q, 'winrates': winrates, 'n_sub_optimals': n_sub_optimals}
 
@@ -169,14 +169,14 @@ def TestParameters(niter=10_000_000, natural=False):
         print('\n\nStarting Training for eps_decay={:.4f} step_size={:.1f}'.format(eps_decay, step_size))
         agent = QLearningAgent(explore_policy=mode, natural=natural, eps_decay=eps_decay, lr=step_size,
                                show_every=100_000, evaluate_iter=10_000)
-        Q, winrates, n_sub_optimals = agent.train(niter=niter)
+        Q, winrates, n_sub_optimals = agent.train(n_episodes=niter)
         policy = agent.get_best_policy()
         results[mode][(eps_decay, step_size)] = {'Q': Q, 'winrates': winrates, 'n_sub_optimals': n_sub_optimals}
 
         with plt.style.context('grayscale'):
             fig_policy = visualization.showPolicy(Q, policy)
             fig_policy.savefig(
-                fname='graficos/QL__{}__{:.3f}__{:.1f}__{}__Policy.png'.format(mode, eps_decay, step_size, niter))
+                fname='graficos/QL__{}__{:.4f}__{:.1f}__{}__Policy.png'.format(mode, eps_decay, step_size, niter))
 
     with plt.style.context('ggplot'):
         fig_opt, fig_win = visualization.LearningProgressComparisonQLearning(results[mode], mode)
@@ -184,19 +184,19 @@ def TestParameters(niter=10_000_000, natural=False):
     fig_opt.savefig('graficos/QL__{}__optimals.png'.format(mode))
 
     temp_decay_rates = [0.99, 0.999, 0.9999]
-    mode = 'decay_epsilon'
-    for eps_decay in temp_decay_rates:
-        print('\n\nStarting Training for eps_decay={:.4f} step_size={:.1f}'.format(eps_decay, step_size))
-        agent = QLearningAgent(explore_policy=mode, natural=natural, eps_decay=eps_decay, lr=step_size,
+    mode = 'boltzmann_exploration'
+    for temp_decay in temp_decay_rates:
+        print('\n\nStarting Training for temp_decay={:.4f} step_size={:.1f}'.format(temp_decay, step_size))
+        agent = QLearningAgent(explore_policy=mode, natural=natural, temp_decay=temp_decay, lr=step_size,
                                show_every=100_000, evaluate_iter=10_000)
-        Q, winrates, n_sub_optimals = agent.train(niter=niter)
+        Q, winrates, n_sub_optimals = agent.train(n_episodes=niter)
         policy = agent.get_best_policy()
-        results[mode][(eps_decay, step_size)] = {'Q': Q, 'winrates': winrates, 'n_sub_optimals': n_sub_optimals}
+        results[mode][(temp_decay, step_size)] = {'Q': Q, 'winrates': winrates, 'n_sub_optimals': n_sub_optimals}
 
         with plt.style.context('grayscale'):
             fig_policy = visualization.showPolicy(Q, policy)
             fig_policy.savefig(
-                fname='graficos/QL__{}__{:.3f}__{:.1f}__{}__Policy.png'.format(mode, eps_decay, step_size, niter))
+                fname='graficos/QL__{}__{:.4f}__{:.1f}__{}__Policy.png'.format(mode, temp_decay, step_size, niter))
 
     with plt.style.context('ggplot'):
         fig_opt, fig_win = visualization.LearningProgressComparisonQLearning(results[mode], mode)
@@ -211,7 +211,7 @@ def main():
     # Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
     agent = QLearningAgent(explore_policy='boltzmann_exploration', eps=0.5)
     print(agent.explore_policy)
-    Q, winrates, n_sub_optimals = agent.train(niter=3_000_000)
+    Q, winrates, n_sub_optimals = agent.train(n_episodes=3_000_000)
     toc = time.time()
     print('Elapsed time: {:.4f} s'.format(toc - tic))
     policy = agent.get_best_policy()
@@ -225,5 +225,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    # results = TestParameters()
+    # main()
+    results = TestParameters()
