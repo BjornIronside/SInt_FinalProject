@@ -147,9 +147,9 @@ def LearningProgressComparisonQLearning(results, mode, show_every=100_000):
 
     for param, step_size in results.keys():
         ax_win.plot(x_iter, np.array(results[(param, step_size)]['winrates']),
-                    label='{}={:.4f} step_size={:.1f}'.format(param_name, param, step_size))
+                    label='{}={:.4f} step_size={:.3f}'.format(param_name, param, step_size))
         ax_opt.plot(x_iter, np.array(results[(param, step_size)]['n_sub_optimals']),
-                    label='{}={:.4f} step_size={:.1f}'.format(param_name, param, step_size))
+                    label='{}={:.4f} step_size={:.3f}'.format(param_name, param, step_size))
 
     ax_win.legend()
     ax_opt.legend()

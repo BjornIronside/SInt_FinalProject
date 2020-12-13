@@ -9,11 +9,11 @@ from tqdm import tqdm
 
 
 class QLearningAgent:
-    def __init__(self, explore_policy='constant_epsilon', eps=0.05, lr=0.1, discount_rate=1, natural=False,
+    def __init__(self, explore_policy='constant_epsilon', eps=0.1, step_size=0.1, discount_rate=1, natural=False,
                  eps_decay=0.9999, min_eps=0.001, show_every=10000, evaluate_iter=1000, temp_decay=0.99999,
                  init_temp=50,
                  min_temp=0.1):
-        self.lr = lr
+        self.step_size = step_size
         self.discount_rate = discount_rate
         self.Q = self.initializeQ()
         self.winrates = []
@@ -84,10 +84,10 @@ class QLearningAgent:
                     action = self.explore_policy(state_values)
                     new_state, reward, done, _ = self.env.step(action)
                     if not done:
-                        self.Q[state][action] = self.Q[state][action] + self.lr * (
+                        self.Q[state][action] = self.Q[state][action] + self.step_size * (
                                 reward + self.discount_rate * max(self.Q[new_state]) - self.Q[state][action])
                     else:
-                        self.Q[state][action] = self.Q[state][action] + self.lr * (
+                        self.Q[state][action] = self.Q[state][action] + self.step_size * (
                                 reward + self.discount_rate * 0 - self.Q[state][action])
 
                 state = new_state
@@ -146,7 +146,7 @@ def TestParameters(niter=10_000_000, natural=False):
     mode = 'constant_epsilon'
     for eps in epss:
         print('\n\nStarting Training for eps={:.2f} step_size={:.1f}'.format(eps, step_size))
-        agent = QLearningAgent(explore_policy=mode, natural=natural, eps=eps, lr=step_size, show_every=100_000,
+        agent = QLearningAgent(explore_policy=mode, natural=natural, eps=eps, step_size=step_size, show_every=100_000,
                                evaluate_iter=10_000)
         Q, winrates, n_sub_optimals = agent.train(n_episodes=niter)
         policy = agent.get_best_policy()
@@ -167,7 +167,7 @@ def TestParameters(niter=10_000_000, natural=False):
     mode = 'decay_epsilon'
     for eps_decay in eps_decay_rates:
         print('\n\nStarting Training for eps_decay={:.4f} step_size={:.1f}'.format(eps_decay, step_size))
-        agent = QLearningAgent(explore_policy=mode, natural=natural, eps_decay=eps_decay, lr=step_size,
+        agent = QLearningAgent(explore_policy=mode, natural=natural, eps_decay=eps_decay, step_size=step_size,
                                show_every=100_000, evaluate_iter=10_000)
         Q, winrates, n_sub_optimals = agent.train(n_episodes=niter)
         policy = agent.get_best_policy()
@@ -187,7 +187,7 @@ def TestParameters(niter=10_000_000, natural=False):
     mode = 'boltzmann_exploration'
     for temp_decay in temp_decay_rates:
         print('\n\nStarting Training for temp_decay={:.4f} step_size={:.1f}'.format(temp_decay, step_size))
-        agent = QLearningAgent(explore_policy=mode, natural=natural, temp_decay=temp_decay, lr=step_size,
+        agent = QLearningAgent(explore_policy=mode, natural=natural, temp_decay=temp_decay, step_size=step_size,
                                show_every=100_000, evaluate_iter=10_000)
         Q, winrates, n_sub_optimals = agent.train(n_episodes=niter)
         policy = agent.get_best_policy()
@@ -206,10 +206,44 @@ def TestParameters(niter=10_000_000, natural=False):
     return results
 
 
+def TestStepSize(niter=10_000_000, natural=False):
+    step_sizes = [0.025 * i for i in range(1, 5)]
+    results = {}
+    for ss in step_sizes:
+        print('\n\nStarting Training for step_size={:.3f}'.format(ss))
+        agent = QLearningAgent(natural=natural, step_size=ss, show_every=100_000, evaluate_iter=10_000)
+        Q, winrates, n_sub_optimals = agent.train(n_episodes=niter)
+        results[(0.1, ss)] = {'Q': Q, 'winrates': winrates, 'n_sub_optimals': n_sub_optimals}
+    with plt.style.context('ggplot'):
+        fig_opt, fig_win = visualization.LearningProgressComparisonQLearning(results, 'constant_epsilon')
+    fig_win.savefig('graficos/QL__ssinfluence__winrates.png')
+    fig_opt.savefig('graficos/QL__ssinfluence__optimals.png')
+
+
+def FinalTests(niter=10_000_000, runs=5, natural=False):
+    mode_params = {'constant_epsilon': [0.05, 0.10, 0.15],
+                   'decay_epsilon': [0.99, 0.999, 0.9999],
+                   'boltzmann_exploration': [0.99, 0.999, 0.9999]}
+    for mode, values in mode_params.items():
+        for val in values:
+            if mode == 'constant_epsilon':
+                agent = QLearningAgent(explore_policy=mode, natural=natural, eps=val, step_size=0.025,
+                                       show_every=niter, evaluate_iter=100_000)
+            elif mode == 'decay_epsilon':
+                agent = QLearningAgent(explore_policy=mode, natural=natural, eps_decay=val, step_size=0.025,
+                                       show_every=niter, evaluate_iter=100_000)
+            else:
+                agent = QLearningAgent(explore_policy=mode, natural=natural, temp_decay=val, step_size=0.025,
+                                       show_every=niter, evaluate_iter=100_000)
+
+
+
+
+
 def main():
     tic = time.time()
-    # Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
-    agent = QLearningAgent(explore_policy='boltzmann_exploration', eps=0.5)
+    agent = QLearningAgent(explore_policy='constant_epsilon', eps=0.5, step_size=0.025, show_every=100_000,
+                           evaluate_iter=10_000)
     print(agent.explore_policy)
     Q, winrates, n_sub_optimals = agent.train(n_episodes=3_000_000)
     toc = time.time()
@@ -227,3 +261,4 @@ def main():
 if __name__ == '__main__':
     # main()
     results = TestParameters()
+    # TestStepSize()
