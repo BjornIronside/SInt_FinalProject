@@ -220,21 +220,35 @@ def TestStepSize(niter=10_000_000, natural=False):
     fig_opt.savefig('graficos/QL__ssinfluence__optimals.png')
 
 
-def FinalTests(niter=10_000_000, runs=5, natural=False):
+def FinalTests(niter=10_000_000, runs=5, natural=False, eval_games=1_000_000):
     mode_params = {'constant_epsilon': [0.05, 0.10, 0.15],
                    'decay_epsilon': [0.99, 0.999, 0.9999],
                    'boltzmann_exploration': [0.99, 0.999, 0.9999]}
+    f = open('QL_Final_Tests__{}x{}.txt'.format(runs, niter), 'w')
+    f.write('Mode,Parameter,Winrate,Suboptimal Actions\n')
     for mode, values in mode_params.items():
         for val in values:
             if mode == 'constant_epsilon':
                 agent = QLearningAgent(explore_policy=mode, natural=natural, eps=val, step_size=0.025,
-                                       show_every=niter, evaluate_iter=100_000)
+                                       show_every=niter, evaluate_iter=eval_games)
             elif mode == 'decay_epsilon':
                 agent = QLearningAgent(explore_policy=mode, natural=natural, eps_decay=val, step_size=0.025,
-                                       show_every=niter, evaluate_iter=100_000)
+                                       show_every=niter, evaluate_iter=eval_games)
             else:
                 agent = QLearningAgent(explore_policy=mode, natural=natural, temp_decay=val, step_size=0.025,
-                                       show_every=niter, evaluate_iter=100_000)
+                                       show_every=niter, evaluate_iter=eval_games)
+
+            winrates = []
+            n_sub_optimals = []
+            for i in range(1, runs + 1):
+                print('Starting Run {} for {}, {}'.format(i, mode, val))
+                _, win, opt = agent.train(n_episodes=niter)
+                winrates.extend(win)
+                n_sub_optimals.extend(opt)
+
+            f.write('{},{},{},{}\n'.format(mode, val, np.mean(winrates), np.mean(n_sub_optimals)))
+
+
 
 
 
@@ -242,10 +256,10 @@ def FinalTests(niter=10_000_000, runs=5, natural=False):
 
 def main():
     tic = time.time()
-    agent = QLearningAgent(explore_policy='constant_epsilon', eps=0.5, step_size=0.025, show_every=100_000,
-                           evaluate_iter=10_000)
+    agent = QLearningAgent(explore_policy='boltzmann_exploration', eps=0.5, step_size=0.025, show_every=100_000,
+                           evaluate_iter=100_000)
     print(agent.explore_policy)
-    Q, winrates, n_sub_optimals = agent.train(n_episodes=3_000_000)
+    Q, winrates, n_sub_optimals = agent.train(n_episodes=10_000_000)
     toc = time.time()
     print('Elapsed time: {:.4f} s'.format(toc - tic))
     policy = agent.get_best_policy()
@@ -260,5 +274,6 @@ def main():
 
 if __name__ == '__main__':
     # main()
-    results = TestParameters()
+    # results = TestParameters()
     # TestStepSize()
+    FinalTests()
