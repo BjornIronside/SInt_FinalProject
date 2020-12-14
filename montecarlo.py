@@ -9,7 +9,7 @@ import time
 
 class MCLearningAgent:
     def __init__(self, explore_policy='constant epsilon', eps=0.05, natural=False,
-                 eps_decay=0.9999, show_every=10000, evaluate_iter=1000, temp_decay=0.9999, init_temp=20):
+                 eps_decay=0.9999, show_every=1000000, evaluate_iter=1000, temp_decay=0.9999, init_temp=20):
         self.Q = self.initializeQ()
         self.winrates = []
         self.natural = natural
@@ -18,6 +18,7 @@ class MCLearningAgent:
         self.env = blackjack.BlackjackEnv(natural=self.natural)
         self.n_sub_optimals = []
         self.min_eps = 0.001
+        self.min_temp = 0.1
         if explore_policy == 'constant_epsilon':
             self.explore_policy = self.e_greedy
             self.eps = eps
@@ -81,17 +82,17 @@ class MCLearningAgent:
                     newState, reward, gameEnd, _ = self.env.step(action)
                     memory.append((state, action, reward))
                 else:
-                    """state_values = self.Q[state]
+                    state_values = self.Q[state]
                     action = state_values.index(max(state_values))
                     newState, reward, gameEnd, _ = self.env.step(action)
                     memory.append((state, action, reward))
-                state = newState"""
-
-                    state_values = self.Q[state]
-                    action = self.explore_policy(state_values)
-                    newState, reward, gameEnd, _ = self.env.step(action)
-                    memory.append((state, action, reward))
                 state = newState
+
+                #     state_values = self.Q[state]
+                #     action = self.explore_policy(state_values)
+                #     newState, reward, gameEnd, _ = self.env.step(action)
+                #     memory.append((state, action, reward))
+                # state = newState
 
             G = 0
             gamma = 1
@@ -109,10 +110,10 @@ class MCLearningAgent:
             if self.temp_decay != 1:
                 self.temp *= self.temp_decay
 
-            # if i % self.show_every == 0:
-            #     print('Iteration ', i)
-            #     print('Eps: {}\nTemp: {}'.format(self.eps, self.temp))
-            #     self.evaluate_policy()
+            if i % self.show_every == 0:
+                print('Iteration ', i)
+                print('Eps: {}\nTemp: {}'.format(self.eps, self.temp))
+                self.evaluate_policy()
 
         return self.Q, self.winrates, self.n_sub_optimals
 
@@ -152,6 +153,8 @@ class MCLearningAgent:
             # temp decay
             if self.temp_decay != 1:
                 self.temp *= self.temp_decay
+                self.temp = max(self.temp, self.min_temp)
+
 
             if i % self.show_every == 0:
                 print('Iteration ', i)
@@ -191,9 +194,9 @@ class MCLearningAgent:
 def main():
     tic = time.time()
     # Q, winrates, n_sub_optimals = QLearning(eps=0.05, step_size=0.1, niter=100000, natural=False)
-    agent = MCLearningAgent(explore_policy='decay_epson', eps=0.1)
+    agent = MCLearningAgent(explore_policy='decay_epsilon', eps=0.1)
     print(agent.explore_policy)
-    Q, winrates, n_sub_optimals = agent.exploringStarts(numIterations=500_000)
+    Q, winrates, n_sub_optimals = agent.exploringStarts(numIterations=100_000_000)
     toc = time.time()
     print('Elapsed time: {:.4f} s'.format(toc - tic))
     policy = agent.get_best_policy()
@@ -206,17 +209,18 @@ def main():
     plt.tight_layout()
     plt.show()
 
-def TestParametersWES(niter=10_000_000, natural=False):
+def TestParametersWES(niter=10_000, natural=False):
     step_sizes = [0.1 * i for i in range(1, 10)]
     results = {'constant_epsilon': {}, 'decay_epsilon': {}, 'boltzmann_exploration': {}}
     # Without Exploring Starts
+
     # Constant Epsilon
     epss = [0.05 * i for i in range(1, 4)]
     mode = 'constant_epsilon'
     for eps in epss:
         print('\n\nStarting Training for eps={:.2f}'.format(eps))
         agent = MCLearningAgent(explore_policy=mode, natural=natural, eps=eps,
-                               show_every=100_000,
+                               show_every=1000,
                                evaluate_iter=10_000)
         Q, winrates, n_sub_optimals = agent.withoutExploringStarts(numIterations=niter)
         policy = agent.get_best_policy()
@@ -229,6 +233,7 @@ def TestParametersWES(niter=10_000_000, natural=False):
         fig_opt, fig_win = visualization.LearningProgressComparisonWithoutExploringStarts(results[mode], mode)
     fig_win.savefig('graficos/MC WES__{}__winrates.png'.format(mode))
     fig_opt.savefig('graficos/MC WES__{}__optimals.png'.format(mode))
+
     # Epsilon Decay
     eps_decay_rates = [0.99, 0.999, 0.9999]
     mode = 'decay_epsilon'
@@ -266,6 +271,23 @@ def TestParametersWES(niter=10_000_000, natural=False):
     fig_opt.savefig('graficos/MC WES__{}__optimals.png'.format(mode))
     return results
 
+def FinalTestsES(niter=10_000_000, runs=5, natural=False, eval_games=10_000):
+
+    f = open('MC ES_Final_Tests__{}x{}.txt'.format(runs, niter), 'w')
+    f.write('Mode,Parameter,Winrate,Suboptimal Actions\n')
+
+    agent = MCLearningAgent(natural=natural,
+                            show_every=100_000, evaluate_iter=eval_games)
+    winrates = []
+    n_sub_optimals = []
+    for i in range(1, runs + 1):
+        print('Starting Run {} '.format(i))
+        _, win, opt = agent.ExploringStarts(numIterations=niter)
+        winrates.extend(win)
+        n_sub_optimals.extend(opt)
+
+    f.write('{},{}\n'.format(np.mean(winrates), np.mean(n_sub_optimals)))
+    f.close()
 
 def FinalTests(niter=10_000_000, runs=5, natural=False, eval_games=10_000):
 
@@ -278,13 +300,13 @@ def FinalTests(niter=10_000_000, runs=5, natural=False, eval_games=10_000):
         for val in values:
             if mode == 'constant_epsilon':
                 agent = MCLearningAgent(explore_policy=mode, natural=natural, eps=val,
-                                       show_every=niter, evaluate_iter=eval_games)
+                                       show_every=100_000, evaluate_iter=eval_games)
             elif mode == 'decay_epsilon':
                 agent = MCLearningAgent(explore_policy=mode, natural=natural, eps_decay=val,
-                                       show_every=niter, evaluate_iter=eval_games)
+                                       show_every=100_000, evaluate_iter=eval_games)
             else:
                 agent = MCLearningAgent(explore_policy=mode, natural=natural, temp_decay=val,
-                                       show_every=niter, evaluate_iter=eval_games)
+                                       show_every=100_000, evaluate_iter=eval_games)
 
             winrates = []
             n_sub_optimals = []
@@ -298,6 +320,6 @@ def FinalTests(niter=10_000_000, runs=5, natural=False, eval_games=10_000):
     f.close()
 
 if __name__ == '__main__':
-    # main()
+    main() # MC ES
     # results = TestParametersWES()
-    FinalTests()
+    # FinalTests() #MC WES
