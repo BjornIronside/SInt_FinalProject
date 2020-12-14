@@ -105,18 +105,19 @@ def showPolicy(Q, policy):
 def LearningProgess(winrates, n_sub_optimals):
     winrates = np.array(winrates)
     n_sub_optimals = np.array(n_sub_optimals)
-    x_iter = np.array([(i + 1) * 1000 for i in range(len(winrates))])
+    x_iter_win = np.array([i * 100_000 for i in range(len(winrates))])
+    x_iter_opt = np.array([i * 10_000 for i in range(len(n_sub_optimals))])
 
     fig_learn, axs = plt.subplots(nrows=1, ncols=2)
     # plt.style.use('ggplot')
     ax = axs[0]
-    ax.plot(x_iter, winrates)
+    ax.plot(x_iter_win, winrates)
     ax.set_title('Win Rate of Policy Over 1000 Games')
     ax.set_xlabel('Iteration')
     ax.set_ylabel('Win Rate %')
 
     ax = axs[1]
-    ax.plot(x_iter, n_sub_optimals)
+    ax.plot(x_iter_opt, n_sub_optimals)
     ax.set_title('Difference from Optimal Policy')
     ax.set_xlabel('Iteration')
     ax.set_ylabel('Number of Suboptimal Actions')
@@ -126,8 +127,10 @@ def LearningProgess(winrates, n_sub_optimals):
 
 
 def LearningProgressComparisonQLearning(results, mode, show_every=100_000):
-    n_points = len(list(results.values())[0]['winrates'])
-    x_iter = np.array([i * show_every for i in range(n_points)])
+    n_points_win = len(list(results.values())[0]['winrates'])
+    x_iter_win = np.array([i * show_every for i in range(n_points_win)])
+    n_points_opt = len(list(results.values())[0]['winrates'])
+    x_iter_opt = np.array([i * show_every for i in range(n_points_opt)])
     if mode == 'constant_epsilon':
         param_name = 'eps'
     elif mode == 'decay_epsilon':
@@ -146,9 +149,9 @@ def LearningProgressComparisonQLearning(results, mode, show_every=100_000):
     ax_opt.set_ylabel('Number of Suboptimal Actions')
 
     for param, step_size in results.keys():
-        ax_win.plot(x_iter, np.array(results[(param, step_size)]['winrates']),
+        ax_win.plot(x_iter_win, np.array(results[(param, step_size)]['winrates']),
                     label='{}={:.4f} step_size={:.3f}'.format(param_name, param, step_size))
-        ax_opt.plot(x_iter, np.array(results[(param, step_size)]['n_sub_optimals']),
+        ax_opt.plot(x_iter_opt, np.array(results[(param, step_size)]['n_sub_optimals']),
                     label='{}={:.4f} step_size={:.3f}'.format(param_name, param, step_size))
 
     ax_win.legend()

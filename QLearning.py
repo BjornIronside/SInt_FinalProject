@@ -11,8 +11,7 @@ from tqdm import tqdm
 class QLearningAgent:
     def __init__(self, explore_policy='constant_epsilon', eps=0.1, step_size=0.1, discount_rate=1, natural=False,
                  eps_decay=0.9999, min_eps=0.001, show_every=10000, evaluate_iter=1000, temp_decay=0.99999,
-                 init_temp=50,
-                 min_temp=0.1):
+                 init_temp=50, min_temp=0.1):
         self.step_size = step_size
         self.discount_rate = discount_rate
         self.Q = self.initializeQ()
@@ -105,6 +104,10 @@ class QLearningAgent:
             if i % self.show_every == 0:
                 print('\nEps: {:.4f}\nTemp: {:.4f}'.format(self.eps, self.temp))
                 self.evaluate_policy()
+            if i % 10_000 == 0:
+                policy = self.get_best_policy()
+                n_sub_optimal = visualization.compare2Optimal(policy)
+                self.n_sub_optimals.append(n_sub_optimal)
 
         return self.Q, self.winrates, self.n_sub_optimals
 
@@ -133,7 +136,6 @@ class QLearningAgent:
         n_sub_optimal = visualization.compare2Optimal(policy)
         print('Suboptimal Actions: {}/200\n'.format(n_sub_optimal))
         self.winrates.append(winrate)
-        self.n_sub_optimals.append(n_sub_optimal)
 
 
 def TestParameters(niter=10_000_000, natural=False):
@@ -221,9 +223,10 @@ def TestStepSize(niter=10_000_000, natural=False):
 
 
 def FinalTests(niter=10_000_000, runs=5, natural=False, eval_games=1_000_000):
-    mode_params = {'constant_epsilon': [0.05, 0.10, 0.15],
-                   'decay_epsilon': [0.99, 0.999, 0.9999],
-                   'boltzmann_exploration': [0.99, 0.999, 0.9999]}
+    # 'constant_epsilon': [0.05, 0.10, 0.15],
+    mode_params = {
+        'decay_epsilon': [0.99, 0.999, 0.9999],
+        'boltzmann_exploration': [0.99, 0.999, 0.9999]}
     f = open('QL_Final_Tests__{}x{}.txt'.format(runs, niter), 'w')
     f.write('Mode,Parameter,Winrate,Suboptimal Actions\n')
     for mode, values in mode_params.items():
@@ -248,15 +251,12 @@ def FinalTests(niter=10_000_000, runs=5, natural=False, eval_games=1_000_000):
 
             f.write('{},{},{},{}\n'.format(mode, val, np.mean(winrates), np.mean(n_sub_optimals)))
 
-
-
-
-
+    f.close()
 
 
 def main():
     tic = time.time()
-    agent = QLearningAgent(explore_policy='boltzmann_exploration', eps=0.5, step_size=0.025, show_every=100_000,
+    agent = QLearningAgent(explore_policy='boltzmann_exploration', temp_decay=0.99, step_size=0.025, show_every=100_000,
                            evaluate_iter=100_000)
     print(agent.explore_policy)
     Q, winrates, n_sub_optimals = agent.train(n_episodes=10_000_000)
@@ -265,15 +265,14 @@ def main():
     policy = agent.get_best_policy()
     with plt.style.context('grayscale'):
         fig_policy = visualization.showPolicy(Q, policy)
-
+        fig_policy.savefig('QL_BE_final_policy.png')
     with plt.style.context('ggplot'):
         fig_learn = visualization.LearningProgess(winrates, n_sub_optimals)
-    plt.tight_layout()
-    plt.show()
+        fig_learn.savefig('QL_BE_final_learn.png')
 
 
 if __name__ == '__main__':
-    # main()
+    main()
     # results = TestParameters()
     # TestStepSize()
-    FinalTests()
+    # FinalTests()
